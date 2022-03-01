@@ -40,9 +40,7 @@ template <class T>
 using unique_ptr_aligned = std::unique_ptr<T, delete_aligned<T>>;
 template <class T>
 unique_ptr_aligned<T> aligned_uptr(size_t align, size_t size) {
-  void *result;
-  return unique_ptr_aligned<T>(
-      static_cast<T *>(aligned_mem_alloc(size * sizeof(T), align)));
+  return unique_ptr_aligned<T>(static_cast<T *>(aligned_mem_alloc(size * sizeof(T), align)));
 }
 
 class image_component {
@@ -57,13 +55,8 @@ class image_component {
 
  public:
   image_component(uint16_t c)
-      : index(c),
-        width(0),
-        height(0),
-        bits_per_pixel(0),
-        is_signed(false),
-        buf(nullptr) {}
-  virtual ~image_component() = default;
+      : index(c), width(0), height(0), bits_per_pixel(0), is_signed(false), buf(nullptr) {}
+  virtual ~image_component()                    = default;
   virtual int read(const std::string &filename) = 0;
   uint32_t get_width() { return width; }
   uint32_t get_height() { return height; }
