@@ -1,4 +1,3 @@
-#include <arm_neon.h>
 #include <algorithm>
 
 #include "image_io.hpp"
@@ -91,10 +90,6 @@ image::image(const std::vector<std::string> &filenames) : width(0), height(0), b
 }
 
 int image::read_ppm(const std::string &filename, uint16_t compidx) {
-  bool isASCII     = false;
-  bool isBigendian = false;
-  bool isSigned    = false;
-
   FILE *fp = fopen(filename.c_str(), "rb");
   if (fp == nullptr) {
     printf("ERROR: File %s is not found.\n", filename.c_str());
@@ -111,16 +106,15 @@ int image::read_ppm(const std::string &filename, uint16_t compidx) {
     return EXIT_FAILURE;
   }
 
-  bool isPPM = false;
-
   d = fgetc(fp);
   switch (d) {
     // PPM
     case '3':
-      isASCII = true;
+      printf("ASCII PPM is not supported.\n");
+      fclose(fp);
+      return EXIT_FAILURE;
+      break;
     case '6':
-      isPPM       = true;
-      isBigendian = true;
       break;
     // error
     default:
@@ -172,9 +166,8 @@ int image::read_ppm(const std::string &filename, uint16_t compidx) {
   const uint32_t component_gap        = 3 * byte_per_sample;
   const uint32_t compw                = components[compidx]->get_width();
   const uint32_t comph                = components[compidx]->get_height();
-  const uint32_t line_width           = component_gap * compw;
-  const uint32_t length               = line_width * comph;
-  std::unique_ptr<uint8_t[]> line_buf = std::make_unique<uint8_t[]>(line_width);
+  const uint32_t length               = component_gap * compw * comph;
+  std::unique_ptr<uint8_t[]> line_buf = std::make_unique<uint8_t[]>(component_gap * compw);
   // allocate memory
   for (size_t i = compidx; i < compidx + 3; ++i) {
     components[i]->create_buf(compw * comph);
@@ -186,174 +179,59 @@ int image::read_ppm(const std::string &filename, uint16_t compidx) {
     fclose(fp);
     return EXIT_FAILURE;
   }
-  auto R               = components[compidx]->get_buf();
-  auto G               = components[compidx + 1]->get_buf();
-  auto B               = components[compidx + 2]->get_buf();
-  const int32_t shift0 = (isBigendian && (byte_per_sample > 1)) ? 8 : 0;
-  auto src             = tmp.get();
+  auto R   = components[compidx]->get_buf();
+  auto G   = components[compidx + 1]->get_buf();
+  auto B   = components[compidx + 2]->get_buf();
+  auto src = tmp.get();
+
+#if defined(USE_ARM_NEON)
   switch (byte_per_sample) {
     case 1:  // <= 8bpp
-      for (size_t i = 0; i < compw * comph; i += 16) {
+      for (size_t i = 0; i < compw * comph - (compw * comph) % 16; i += 16) {
         uint8x16x3_t vsrc = vld3q_u8((src + i * component_gap));
-        uint8x16_t aR     = vsrc.val[0];
-        uint8x16_t aG     = vsrc.val[1];
-        uint8x16_t aB     = vsrc.val[2];
-
-        int16x8_t rl = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(aR)));
-        int16x8_t rh = vreinterpretq_s16_u16(vmovl_u8(vget_high_u8(aR)));
-        auto rll     = vmovl_s16(vget_low_s16(rl));
-        auto rlh     = vmovl_s16(vget_high_s16(rl));
-        auto rhl     = vmovl_s16(vget_low_s16(rh));
-        auto rhh     = vmovl_s16(vget_high_s16(rh));
-        vst1q_s32(R + i, rll);
-        vst1q_s32(R + i + 4, rlh);
-        vst1q_s32(R + i + 8, rhl);
-        vst1q_s32(R + i + 12, rhh);
-
-        int16x8_t gl = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(aG)));
-        int16x8_t gh = vreinterpretq_s16_u16(vmovl_u8(vget_high_u8(aG)));
-        auto gll     = vmovl_s16(vget_low_s16(gl));
-        auto glh     = vmovl_s16(vget_high_s16(gl));
-        auto ghl     = vmovl_s16(vget_low_s16(gh));
-        auto ghh     = vmovl_s16(vget_high_s16(gh));
-        vst1q_s32(G + i, gll);
-        vst1q_s32(G + i + 4, glh);
-        vst1q_s32(G + i + 8, ghl);
-        vst1q_s32(G + i + 12, ghh);
-
-        int16x8_t bl = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(aB)));
-        int16x8_t bh = vreinterpretq_s16_u16(vmovl_u8(vget_high_u8(aB)));
-        auto bll     = vmovl_s16(vget_low_s16(bl));
-        auto blh     = vmovl_s16(vget_high_s16(bl));
-        auto bhl     = vmovl_s16(vget_low_s16(bh));
-        auto bhh     = vmovl_s16(vget_high_s16(bh));
-        vst1q_s32(B + i, bll);
-        vst1q_s32(B + i + 4, blh);
-        vst1q_s32(B + i + 8, bhl);
-        vst1q_s32(B + i + 12, bhh);
+        store_u8_to_s32(vsrc.val[0], R + i);
+        store_u8_to_s32(vsrc.val[1], G + i);
+        store_u8_to_s32(vsrc.val[2], B + i);
+      }
+      for (size_t i = compw * comph - (compw * comph) % 16; i < compw * comph; ++i) {
+        R[i] = src[component_gap * i];
+        G[i] = src[component_gap * i + byte_per_sample];
+        B[i] = src[component_gap * i + 2 * byte_per_sample];
       }
       break;
     case 2:  // > 8bpp
-      for (size_t i = 0; i < compw * comph; i += 8) {
+      for (size_t i = 0; i < compw * comph - (compw * comph) % 8; i += 8) {
         uint16x8x3_t vsrc = vld3q_u16((uint16_t *)(src + i * component_gap));
-        uint16x8_t aR     = vrev16q_u8(vsrc.val[0]);
-        uint16x8_t aG     = vrev16q_u8(vsrc.val[1]);
-        uint16x8_t aB     = vrev16q_u8(vsrc.val[2]);
-
-        auto r0 = vreinterpretq_s32_s16(aR);
-        auto rl = vmovl_s16(vget_low_s32(r0));
-        auto rh = vmovl_s16(vget_high_s32(r0));
-        vst1q_s32(R + i, rl);
-        vst1q_s32(R + i + 4, rh);
-
-        auto g0 = vreinterpretq_s32_s16(aG);
-        auto gl = vmovl_s16(vget_low_s32(g0));
-        auto gh = vmovl_s16(vget_high_s32(g0));
-        vst1q_s32(G + i, gl);
-        vst1q_s32(G + i + 4, gh);
-
-        auto b0 = vreinterpretq_s32_s16(aB);
-        auto bl = vmovl_s16(vget_low_s32(b0));
-        auto bh = vmovl_s16(vget_high_s32(b0));
-        vst1q_s32(B + i, bl);
-        vst1q_s32(B + i + 4, bh);
+        store_u16_to_s32(vsrc.val[0], R + i);
+        store_u16_to_s32(vsrc.val[1], G + i);
+        store_u16_to_s32(vsrc.val[2], B + i);
+      }
+      for (size_t i = compw * comph - (compw * comph) % 8; i < compw * comph; ++i) {
+        R[i] = src[component_gap * i] << 8;
+        R[i] |= src[component_gap * i + 1];
+        G[i] = src[component_gap * i + 2] << 8;
+        G[i] |= src[component_gap * i + 3];
+        B[i] = src[component_gap * i + 4] << 8;
+        B[i] |= src[component_gap * i + 5];
       }
       break;
     default:
       break;
   }
-  // for (size_t i = 0; i < compw * comph; ++i) {
-  //   R[i] = src[component_gap * i] << shift0;
-  //   G[i] = src[component_gap * i + byte_per_sample] << shift0;
-  //   B[i] = src[component_gap * i + 2 * byte_per_sample] << shift0;
-  // }
-  // const int32_t shift1 = (isBigendian && (byte_per_sample > 1)) ? 0 : 8;
-  // for (size_t i = 0; i < compw * comph * (byte_per_sample - 1); ++i) {
-  //   R[i] |= src[component_gap * i + 1] << shift1;
-  //   G[i] |= src[component_gap * i + byte_per_sample + 1] << shift1;
-  //   B[i] |= src[component_gap * i + 2 * byte_per_sample + 1] << shift1;
-  // }
-
-  // if (!isASCII) {
-  //   for (size_t i = 0; i < comph; ++i) {
-  //     if (fread(line_buf.get(), sizeof(uint8_t), line_width, fp) < line_width) {
-  //       printf("ERROR: not enough samples in the given pnm file.\n");
-  //       fclose(fp);
-  //       return EXIT_FAILURE;
-  //     }
-  //     for (size_t c = compidx; c < compidx + 3; ++c) {
-  //       uint8_t *src;
-  //       int32_t *dst;
-  //       src = &line_buf[c * byte_per_sample];
-
-  //       dst = components[c]->get_buf(i * compw);  //  &this->buf[c][i * compw];
-
-  //       switch (byte_per_sample) {
-  //         case 1:
-  //           for (size_t j = 0; j < compw; ++j) {
-  //             *dst = (isSigned) ? static_cast<int8_t>(*src) : *src;
-  //             dst++;
-  //             src += component_gap;
-  //           }
-  //           break;
-  //         case 2:
-  //           if (isSigned) {
-  //             if (isBigendian) {
-  //               for (size_t j = 0; j < compw; ++j) {
-  //                 *dst = static_cast<int_least16_t>(
-  //                     (static_cast<uint_least16_t>(src[0]) << 8) |
-  //                     static_cast<uint_least16_t>(src[1]));
-  //                 dst++;
-  //                 src += component_gap;
-  //               }
-  //             } else {
-  //               for (size_t j = 0; j < compw; ++j) {
-  //                 *dst = static_cast<int_least16_t>(
-  //                     static_cast<uint_least16_t>(src[0]) |
-  //                     (static_cast<uint_least16_t>(src[1]) << 8));
-  //                 dst++;
-  //                 src += component_gap;
-  //               }
-  //             }
-  //           } else {
-  //             if (isBigendian) {
-  //               for (size_t j = 0; j < compw; ++j) {
-  //                 *dst = (src[0] << 8) | src[1];
-  //                 dst++;
-  //                 src += component_gap;
-  //               }
-  //             } else {
-  //               for (size_t j = 0; j < compw; ++j) {
-  //                 *dst = src[0] | (src[1] << 8);
-  //                 dst++;
-  //                 src += component_gap;
-  //               }
-  //             }
-  //           }
-  //           break;
-  //         default:
-  //           printf("ERROR: bit-depth over 16 is not supported.\n");
-  //           fclose(fp);
-  //           return EXIT_FAILURE;
-  //           break;
-  //       }
-  //     }
-  //   }
-  // } else {
-  //   for (size_t i = 0; i < compw * comph; ++i) {
-  //     for (size_t c = compidx; c < compidx + 3; ++c) {
-  //       int32_t *dst = components[c]->get_buf(i);
-  //       val = 0;
-  //       d = fgetc(fp);
-  //       while (d != SP && d != CR && d != LF && d != EOF) {
-  //         val *= 10;
-  //         val += d - '0';
-  //         d = fgetc(fp);
-  //       }
-  //       dst[0] = val;
-  //     }
-  //   }
-  // }
+#else
+  for (size_t i = 0; i < compw * comph; ++i) {
+    R[i] = src[component_gap * i] << 8;
+    G[i] = src[component_gap * i + byte_per_sample] << 8;
+    B[i] = src[component_gap * i + 2 * byte_per_sample] << 8;
+  }
+  if (byte_per_sample > 1) {
+    for (size_t i = 0; i < compw * comph; ++i) {
+      R[i] |= src[component_gap * i + 1];
+      G[i] |= src[component_gap * i + byte_per_sample + 1];
+      B[i] |= src[component_gap * i + 2 * byte_per_sample + 1];
+    }
+  }
+#endif
   fclose(fp);
   return EXIT_SUCCESS;
 }
