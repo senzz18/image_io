@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-#if defined(__ARM_NEON__) || defined(__ARM64__)
+#if defined(__ARM_NEON__) || defined(__ARM_NEON)
   #define USE_ARM_NEON
   #include <arm_neon.h>
 #endif
@@ -19,7 +19,7 @@ constexpr char CR = 0x0d;
 enum class status { READ_WIDTH, READ_HEIGHT, READ_MAXVAL, DONE };
 enum class imgformat { PGM, PPM, PGX };
 // eat white/LF/CR and comments
-auto eat_white = [](int &d, FILE *fp, char *comment) {
+static auto eat_white = [](int &d, FILE *fp, char *comment) {
   while (d == SP || d == LF || d == CR) {
     d = fgetc(fp);
     if (d == '#') {
@@ -82,7 +82,7 @@ class image_component {
 
 #if defined(USE_ARM_NEON)
 // store uint8x16_t vector as int32
-auto store_u8_to_s32 = [](uint8x16_t &src, int32_t *dst) {
+static auto store_u8_to_s32 = [](uint8x16_t &src, int32_t *dst) {
   int16x8_t l = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(src)));
   int16x8_t h = vreinterpretq_s16_u16(vmovl_u8(vget_high_u8(src)));
   auto ll     = vmovl_s16(vget_low_s16(l));
@@ -96,11 +96,11 @@ auto store_u8_to_s32 = [](uint8x16_t &src, int32_t *dst) {
 };
 
 // store uint16x8_t vector as int32
-auto store_u16_to_s32 = [](uint16x8_t &src, int32_t *dst) {
+static auto store_u16_to_s32 = [](uint16x8_t &src, int32_t *dst) {
   auto little_big = vrev16q_u8(src);  // convert endianness from big to little
   auto x0         = vreinterpretq_s32_s16(little_big);
-  auto xl         = vmovl_s16(vget_low_s32(x0));
-  auto xh         = vmovl_s16(vget_high_s32(x0));
+  auto xl         = vmovl_s16(vreinterpret_s16_s32(vget_low_s32(x0)));
+  auto xh         = vmovl_s16(vreinterpret_s16_s32(vget_high_s32(x0)));
   vst1q_s32(dst, xl);
   vst1q_s32(dst + 4, xh);
 };
