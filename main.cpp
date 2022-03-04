@@ -1,9 +1,11 @@
 #include <chrono>
 #include <cstdio>
 #include <string>
-#include <opencv2/opencv.hpp>
+#if defined(USE_OPENCV)
+  #include <opencv2/opencv.hpp>
+#endif
 #include "image_io.hpp"
-using namespace cv;
+
 int main(int argc, char *argv[]) {
   auto start = std::chrono::high_resolution_clock::now();
   std::vector<std::string> fnames;
