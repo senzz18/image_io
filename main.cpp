@@ -22,6 +22,7 @@ int main(int argc, char *argv[]) {
     printf("component[%d]: width = %4d, height = %4d, %2d bpp, signed = %d\n", i,
            img.get_component_width(i), img.get_component_height(i), bpp, s);
   }
+#if defined(USE_OPENCV)
   cv::Mat test(img.get_component_height(0), img.get_component_width(0), CV_8UC1);
   int32_t *src = img.get_buf(0);
   uint8_t bpp  = (img.get_Ssiz_value(0) & 0x7F) + 1;
@@ -51,5 +52,6 @@ int main(int argc, char *argv[]) {
   cv::imshow("Monochrome preview in 8bpp", test);
   cv::waitKey();
   cv::destroyAllWindows();
+#endif
   return EXIT_SUCCESS;
 }
