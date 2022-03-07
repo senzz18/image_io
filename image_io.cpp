@@ -47,7 +47,9 @@ image::image(const std::vector<std::string> &filenames) : width(0), height(0), b
       case imgformat::PGM:
         printf("PGM\n");
         components.emplace_back(std::make_unique<pgm_component>(c));
-        components[components.size() - 1]->read(fname);
+        if (components[components.size() - 1]->read(fname)) {
+          exit(EXIT_FAILURE);
+        }
         component_width.push_back(components[components.size() - 1]->get_width());
         component_height.push_back(components[components.size() - 1]->get_height());
         bits_per_pixel.push_back(components[components.size() - 1]->get_bpp());
@@ -60,7 +62,9 @@ image::image(const std::vector<std::string> &filenames) : width(0), height(0), b
         components.emplace_back(std::make_unique<pgm_component>(c));
         components.emplace_back(std::make_unique<pgm_component>(c + 1));
         components.emplace_back(std::make_unique<pgm_component>(c + 2));
-        read_ppm(fname, c);
+        if (read_ppm(fname, c)) {
+          exit(EXIT_FAILURE);
+        }
         for (uint16_t i = c; i < c + 3; ++i) {
           component_width.push_back(components[i]->get_width());
           component_height.push_back(components[i]->get_height());
@@ -73,7 +77,9 @@ image::image(const std::vector<std::string> &filenames) : width(0), height(0), b
       case imgformat::PGX:
         printf("PGX\n");
         components.emplace_back(std::make_unique<pgx_component>(c));
-        components[components.size() - 1]->read(fname);
+        if (components[components.size() - 1]->read(fname)) {
+          exit(EXIT_FAILURE);
+        }
         component_width.push_back(components[components.size() - 1]->get_width());
         component_height.push_back(components[components.size() - 1]->get_height());
         bits_per_pixel.push_back(components[components.size() - 1]->get_bpp());
@@ -184,29 +190,32 @@ int image::read_ppm(const std::string &filename, uint16_t compidx) {
   auto B   = components[compidx + 2]->get_buf();
   auto src = tmp.get();
 
+  const size_t simdgap = (byte_per_sample == 1) ? 16 : 8;
+  const size_t simdlen = compw * comph - (compw * comph) % simdgap;
 #if defined(USE_ARM_NEON)
   switch (byte_per_sample) {
     case 1:  // <= 8bpp
-      for (size_t i = 0; i < compw * comph - (compw * comph) % 16; i += 16) {
+
+      for (size_t i = 0; i < simdlen; i += simdgap) {
         uint8x16x3_t vsrc = vld3q_u8((src + i * component_gap));
         store_u8_to_s32(vsrc.val[0], R + i);
         store_u8_to_s32(vsrc.val[1], G + i);
         store_u8_to_s32(vsrc.val[2], B + i);
       }
-      for (size_t i = compw * comph - (compw * comph) % 16; i < compw * comph; ++i) {
+      for (size_t i = simdlen; i < compw * comph; ++i) {
         R[i] = src[component_gap * i];
         G[i] = src[component_gap * i + byte_per_sample];
         B[i] = src[component_gap * i + 2 * byte_per_sample];
       }
       break;
     case 2:  // > 8bpp
-      for (size_t i = 0; i < compw * comph - (compw * comph) % 8; i += 8) {
+      for (size_t i = 0; i < simdlen; i += simdgap) {
         uint16x8x3_t vsrc = vld3q_u16((uint16_t *)(src + i * component_gap));
-        store_u16_to_s32(vsrc.val[0], R + i);
-        store_u16_to_s32(vsrc.val[1], G + i);
-        store_u16_to_s32(vsrc.val[2], B + i);
+        store_big_u16_to_s32(vsrc.val[0], R + i);
+        store_big_u16_to_s32(vsrc.val[1], G + i);
+        store_big_u16_to_s32(vsrc.val[2], B + i);
       }
-      for (size_t i = compw * comph - (compw * comph) % 8; i < compw * comph; ++i) {
+      for (size_t i = simdlen; i < compw * comph; ++i) {
         R[i] = src[component_gap * i] << 8;
         R[i] |= src[component_gap * i + 1];
         G[i] = src[component_gap * i + 2] << 8;

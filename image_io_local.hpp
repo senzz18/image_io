@@ -95,12 +95,53 @@ static auto store_u8_to_s32 = [](uint8x16_t &src, int32_t *dst) {
   vst1q_s32(dst + 12, hh);
 };
 
-// store uint16x8_t vector as int32
-static auto store_u16_to_s32 = [](uint16x8_t &src, int32_t *dst) {
+// store int8x16_t vector as int32
+static auto store_s8_to_s32 = [](int8x16_t &src, int32_t *dst) {
+  int16x8_t l = vreinterpretq_s16_u16(vmovl_s8(vget_low_s8(src)));
+  int16x8_t h = vreinterpretq_s16_u16(vmovl_s8(vget_high_s8(src)));
+  auto ll     = vmovl_s16(vget_low_s16(l));
+  auto lh     = vmovl_s16(vget_high_s16(l));
+  auto hl     = vmovl_s16(vget_low_s16(h));
+  auto hh     = vmovl_s16(vget_high_s16(h));
+  vst1q_s32(dst, ll);
+  vst1q_s32(dst + 4, lh);
+  vst1q_s32(dst + 8, hl);
+  vst1q_s32(dst + 12, hh);
+};
+
+// store big-endian uint16x8_t vector as int32
+static auto store_big_u16_to_s32 = [](uint16x8_t &src, int32_t *dst) {
   auto little_big = vrev16q_u8(src);  // convert endianness from big to little
-  auto x0         = vreinterpretq_s32_s16(little_big);
+  auto x0         = vreinterpretq_s32_u16(little_big);
   auto xl         = vmovl_s16(vreinterpret_s16_s32(vget_low_s32(x0)));
   auto xh         = vmovl_s16(vreinterpret_s16_s32(vget_high_s32(x0)));
+  vst1q_s32(dst, xl);
+  vst1q_s32(dst + 4, xh);
+};
+
+// store little-endian uint16x8_t vector as int32
+static auto store_little_u16_to_s32 = [](uint16x8_t &src, int32_t *dst) {
+  auto x0 = vreinterpretq_s32_u16(vreinterpretq_u16_u8(src));
+  auto xl = vmovl_s16(vreinterpret_s16_s32(vget_low_s32(x0)));
+  auto xh = vmovl_s16(vreinterpret_s16_s32(vget_high_s32(x0)));
+  vst1q_s32(dst, xl);
+  vst1q_s32(dst + 4, xh);
+};
+
+// store big-endian int16x8_t vector as int32
+static auto store_big_s16_to_s32 = [](uint16x8_t &src, int32_t *dst) {
+  auto x0 = vreinterpretq_s32_s16(vreinterpretq_s16_u8(vrev16q_u8(src)));
+  auto xl = vmovl_s16(vreinterpret_s16_s32(vget_low_s32(x0)));
+  auto xh = vmovl_s16(vreinterpret_s16_s32(vget_high_s32(x0)));
+  vst1q_s32(dst, xl);
+  vst1q_s32(dst + 4, xh);
+};
+
+// store little-endian int16x8_t vector as int32
+static auto store_little_s16_to_s32 = [](uint16x8_t &src, int32_t *dst) {
+  auto x0 = vreinterpretq_s32_s16(vreinterpretq_s16_u8(src));
+  auto xl = vmovl_s16(vreinterpret_s16_s32(vget_low_s32(x0)));
+  auto xh = vmovl_s16(vreinterpret_s16_s32(vget_high_s32(x0)));
   vst1q_s32(dst, xl);
   vst1q_s32(dst + 4, xh);
 };

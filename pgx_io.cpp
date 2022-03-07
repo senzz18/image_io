@@ -32,7 +32,7 @@ int pgx_component::read(const std::string &filename) {
   switch (d) {
     case 'M':
       isBigendian = true;
-      d = fgetc(fp);
+      d           = fgetc(fp);
       if (d != 'L') {
         printf("ERROR: input PGX file %s is broken.\n", filename.c_str());
       }
@@ -81,7 +81,7 @@ int pgx_component::read(const std::string &filename) {
       case status::READ_WIDTH:
         set_width(val);
         val = 0;
-        st = status::READ_HEIGHT;
+        st  = status::READ_HEIGHT;
         break;
       case status::READ_HEIGHT:
         set_height(val);
@@ -95,62 +95,135 @@ int pgx_component::read(const std::string &filename) {
   fseek(fp, -1, SEEK_CUR);
 
   const uint32_t byte_per_sample = (get_bpp() + 8 - 1) / 8;
-  const uint32_t compw = get_width();
-  const uint32_t comph = get_height();
+  const uint32_t compw           = get_width();
+  const uint32_t comph           = get_height();
   create_buf(compw * comph);
-  int32_t *dst = get_buf();
+  int32_t *dst          = get_buf();
+  const uint32_t length = compw * comph;
+#if defined(USE_ARM_NEON)
+  const size_t simdgap = (byte_per_sample == 1) ? 16 : 8;
+  const size_t simdlen = length - (length) % simdgap;
   if (byte_per_sample > 1) {  // > 8 bpp
-    auto line_buf = std::make_unique<uint16_t[]>(compw);
-    for (size_t i = 0; i < comph; ++i) {
-      if (fread(line_buf.get(), sizeof(uint16_t), compw, fp) < compw) {
-        printf("ERROR: not enough samples in the given pgm file.\n");
-        fclose(fp);
-        return EXIT_FAILURE;
-      }
-      if (get_is_signed()) {
-        if (isBigendian) {
-          for (size_t j = 0; j < compw; ++j) {
-            dst[i * compw + j] = static_cast<int16_t>(
-                (line_buf[j] >> 8) | ((line_buf[j] & 0xFF) << 8));
-          }
-        } else {
-          for (size_t j = 0; j < compw; ++j) {
-            dst[i * compw + j] = static_cast<int16_t>(line_buf[j]);
-          }
+    auto tmp = aligned_uptr<uint16_t>(32, length);
+    if (fread(tmp.get(), sizeof(uint16_t), length, fp) < length) {
+      printf("ERROR: not enough samples in the given pnm file.\n");
+      fclose(fp);
+      return EXIT_FAILURE;
+    }
+    auto line_buf = tmp.get();
+    if (get_is_signed()) {
+      if (isBigendian) {
+        for (size_t i = 0; i < simdlen; i += simdgap) {
+          auto src = vld1q_u16(line_buf + i);
+          store_big_s16_to_s32(src, dst + i);
+        }
+        for (size_t i = simdlen; i < length; ++i) {
+          dst[i] = static_cast<int16_t>((line_buf[i] >> 8) | ((line_buf[i] & 0xFF) << 8));
         }
       } else {
-        if (isBigendian) {
-          for (size_t j = 0; j < compw; ++j) {
-            dst[i * compw + j] =
-                (line_buf[j] >> 8) | ((line_buf[j] & 0xFF) << 8);
-          }
-        } else {
-          for (size_t j = 0; j < compw; ++j) {
-            dst[i * compw + j] = line_buf[j];
-          }
+        for (size_t i = 0; i < simdlen; i += simdgap) {
+          auto src = vld1q_u16(line_buf + i);
+          store_little_s16_to_s32(src, dst + i);
+        }
+        for (size_t i = simdlen; i < length; ++i) {
+          dst[i] = static_cast<int16_t>(line_buf[i]);
+        }
+      }
+    } else {
+      if (isBigendian) {
+        for (size_t i = 0; i < simdlen; i += simdgap) {
+          auto src = vld1q_u16(line_buf + i);
+          store_big_u16_to_s32(src, dst + i);
+        }
+        for (size_t i = simdlen; i < length; ++i) {
+          dst[i] = (line_buf[i] >> 8) | ((line_buf[i] & 0xFF) << 8);
+        }
+      } else {
+        for (size_t i = 0; i < simdlen; i += simdgap) {
+          auto src = vld1q_u16(line_buf + i);
+          store_little_u16_to_s32(src, dst + i);
+        }
+        for (size_t i = simdlen; i < length; ++i) {
+          dst[i] = line_buf[i];
         }
       }
     }
   } else {  // <= 8bpp
-    auto line_buf = std::make_unique<uint8_t[]>(compw);
-    for (size_t i = 0; i < comph; ++i) {
-      if (fread(line_buf.get(), sizeof(uint8_t), compw, fp) < compw) {
-        printf("ERROR: not enough samples in the given pgm file.\n");
-        fclose(fp);
-        return EXIT_FAILURE;
+    auto tmp = aligned_uptr<uint8_t>(32, length);
+    if (fread(tmp.get(), sizeof(uint8_t), length, fp) < length) {
+      printf("ERROR: not enough samples in the given pnm file.\n");
+      fclose(fp);
+      return EXIT_FAILURE;
+    }
+    auto line_buf = tmp.get();
+    if (get_is_signed()) {
+      for (size_t i = 0; i < simdlen; i += simdgap) {
+        auto src = vld1q_s8((int8_t *)line_buf + i);
+        store_s8_to_s32(src, dst + i);
       }
-      if (get_is_signed()) {
-        for (size_t j = 0; j < compw; ++j) {
-          dst[i * compw + j] = static_cast<int8_t>(line_buf[j]);
+      for (size_t i = simdlen; i < length; ++i) {
+        dst[i] = static_cast<int8_t>(line_buf[i]);
+      }
+    } else {
+      for (size_t i = 0; i < simdlen; i += simdgap) {
+        auto src = vld1q_u8(line_buf + i);
+        store_u8_to_s32(src, dst + i);
+      }
+      for (size_t i = simdlen; i < length; ++i) {
+        dst[i] = line_buf[i];
+      }
+    }
+  }
+#else
+  if (byte_per_sample > 1) {  // > 8 bpp
+    auto tmp = aligned_uptr<uint16_t>(32, length);
+    if (fread(tmp.get(), sizeof(uint16_t), length, fp) < length) {
+      printf("ERROR: not enough samples in the given pnm file.\n");
+      fclose(fp);
+      return EXIT_FAILURE;
+    }
+    auto line_buf = tmp.get();
+    if (get_is_signed()) {
+      if (isBigendian) {
+        for (size_t i = 0; i < length; ++i) {
+          dst[i] = static_cast<int16_t>((line_buf[i] >> 8) | ((line_buf[i] & 0xFF) << 8));
         }
       } else {
-        for (size_t j = 0; j < compw; ++j) {
-          dst[i * compw + j] = line_buf[j];
+        for (size_t i = 0; i < length; ++i) {
+          dst[i] = static_cast<int16_t>(line_buf[i]);
         }
+      }
+    } else {
+      if (isBigendian) {
+        for (size_t i = 0; i < length; ++i) {
+          dst[i] = (line_buf[i] >> 8) | ((line_buf[i] & 0xFF) << 8);
+        }
+      } else {
+        for (size_t i = 0; i < length; ++i) {
+          dst[i] = line_buf[i];
+        }
+      }
+    }
+  } else {  // <= 8bpp
+    auto tmp = aligned_uptr<uint8_t>(32, length);
+    if (fread(tmp.get(), sizeof(uint8_t), length, fp) < length) {
+      printf("ERROR: not enough samples in the given pnm file.\n");
+      fclose(fp);
+      return EXIT_FAILURE;
+    }
+    auto line_buf = tmp.get();
+    if (get_is_signed()) {
+      for (size_t i = 0; i < length; ++i) {
+        dst[i] = static_cast<int8_t>(line_buf[i]);
+      }
+    } else {
+      for (size_t i = 0; i < length; ++i) {
+        dst[i] = line_buf[i];
       }
     }
   }
 
+#endif
   fclose(fp);
   return EXIT_SUCCESS;
 }
