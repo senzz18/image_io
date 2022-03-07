@@ -31,7 +31,11 @@ int main(int argc, char *argv[]) {
   uint8_t s    = (img.get_Ssiz_value(0) & 0x80) >> 7;
   for (int i = 0; i < test.rows; ++i) {
     for (int j = 0; j < test.cols; ++j) {
-      test.data[i * test.cols + j] = (src[0] + (1 << (bpp - 1)) * s) >> (bpp - 8);
+      if (bpp - 8 > 0) {
+        test.data[i * test.cols + j] = (src[0] + (1 << (bpp - 1)) * s) >> (bpp - 8);
+      } else {
+        test.data[i * test.cols + j] = (src[0] + (1 << (bpp - 1)) * s) << (8 - bpp);
+      }
       src++;
     }
   }
