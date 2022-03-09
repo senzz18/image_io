@@ -96,28 +96,30 @@ image::image(const std::vector<std::string> &filenames) : width(0), height(0), b
 }
 
 int image::read_ppm(const std::string &filename, uint16_t compidx) {
-  FILE *fp = fopen(filename.c_str(), "rb");
-  if (fp == nullptr) {
-    printf("ERROR: File %s is not found.\n", filename.c_str());
-    return EXIT_FAILURE;
-  }
+  // FILE *fp = fopen(filename.c_str(), "rb");
+  // if (fp == nullptr) {
+  //   printf("ERROR: File %s is not found.\n", filename.c_str());
+  //   return EXIT_FAILURE;
+  // }
+  openhtj2k_file fp;
+  fp.open(filename.c_str());
   status st = status::READ_WIDTH;
   int d;
   uint32_t val = 0;
   char comment[256];
-  d = fgetc(fp);
+  d = fp.fgetc();
   if (d != 'P') {
     printf("ERROR: %s is not a PPM file.\n", filename.c_str());
-    fclose(fp);
+    fp.close();
     return EXIT_FAILURE;
   }
 
-  d = fgetc(fp);
+  d = fp.fgetc();
   switch (d) {
     // PPM
     case '3':
       printf("ASCII PPM is not supported.\n");
-      fclose(fp);
+      fp.close();
       return EXIT_FAILURE;
       break;
     case '6':
@@ -125,18 +127,18 @@ int image::read_ppm(const std::string &filename, uint16_t compidx) {
     // error
     default:
       printf("ERROR: %s is not a PPM file.\n", filename.c_str());
-      fclose(fp);
+      fp.close();
       return EXIT_FAILURE;
       break;
   }
   while (st != status::DONE) {
-    d = fgetc(fp);
-    eat_white(d, fp, comment);
+    d = fp.fgetc();
+    eat_white_nb(d, &fp, comment);
     // read numerical value
-    while (d != SP && d != LF && d != CR) {
+    while (d != SPC && d != LF && d != CR) {
       val *= 10;
       val += d - '0';
-      d = fgetc(fp);
+      d = fp.fgetc();
     }
     // update status
     switch (st) {
@@ -165,8 +167,9 @@ int image::read_ppm(const std::string &filename, uint16_t compidx) {
         break;
     }
   }
-  eat_white(d, fp, comment);
-  fseek(fp, -1, SEEK_CUR);
+  eat_white_nb(d, &fp, comment);
+  fp.seek(fp.get_pos() - 1);
+  // fseek(fp, -1, SEEK_CUR);
 
   const uint32_t byte_per_sample      = (components[compidx]->get_bpp() + 8 - 1) / 8;
   const uint32_t component_gap        = 3 * byte_per_sample;
@@ -180,9 +183,9 @@ int image::read_ppm(const std::string &filename, uint16_t compidx) {
     //   this->buf[i] = std::make_unique<int32_t[]>(compw * comph);
   }
   auto tmp = aligned_uptr<uint8_t>(32, length);
-  if (fread(tmp.get(), sizeof(uint8_t), length, fp) < length) {
+  if (fp.read(tmp.get(), sizeof(uint8_t) * length) < length) {
     printf("ERROR: not enough samples in the given pnm file.\n");
-    fclose(fp);
+    fp.close();
     return EXIT_FAILURE;
   }
   auto R   = components[compidx]->get_buf();
@@ -241,7 +244,7 @@ int image::read_ppm(const std::string &filename, uint16_t compidx) {
     }
   }
 #endif
-  fclose(fp);
+  fp.close();
   return EXIT_SUCCESS;
 }
 

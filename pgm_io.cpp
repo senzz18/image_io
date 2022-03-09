@@ -40,7 +40,7 @@ int pgm_component::read(const std::string &filename) {
     d = fgetc(fp);
     eat_white(d, fp, comment);
     // read numerical value
-    while (d != SP && d != LF && d != CR) {
+    while (d != SPC && d != LF && d != CR) {
       val *= 10;
       val += d - '0';
       d = fgetc(fp);
