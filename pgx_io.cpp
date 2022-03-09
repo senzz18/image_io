@@ -63,7 +63,7 @@ int pgx_component::read(const std::string &filename) {
     val *= 10;
     val += d - '0';
     d = fgetc(fp);
-  } while (d != SPC && d != LF && d != CR);
+  } while (d != SP && d != LF && d != CR);
   set_bpp(val);
   val = 0;
 
@@ -71,7 +71,7 @@ int pgx_component::read(const std::string &filename) {
     d = fgetc(fp);
     eat_white(d, fp, comment);
     // read numerical value
-    while (d != SPC && d != LF && d != CR) {
+    while (d != SP && d != LF && d != CR) {
       val *= 10;
       val += d - '0';
       d = fgetc(fp);

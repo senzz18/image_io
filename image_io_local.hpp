@@ -6,103 +6,25 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include <fcntl.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
 
 #if defined(__ARM_NEON__) || defined(__ARM_NEON)
   #define USE_ARM_NEON
   #include <arm_neon.h>
 #endif
 
-constexpr char SPC = 0x20;
-constexpr char LF  = '\n';
-constexpr char CR  = 0x0d;
+constexpr char SP = ' ';
+constexpr char LF = '\n';
+constexpr char CR = 0x0d;
 
 enum class status { READ_WIDTH, READ_HEIGHT, READ_MAXVAL, DONE };
 enum class imgformat { PGM, PPM, PGX };
-class openhtj2k_file {
- private:
-  int fd;
-  size_t pos;
-  bool is_open;
-
- public:
-  openhtj2k_file() : fd(-1), pos(0), is_open(false){};
-  bool open(const char *fname) {
-    fd = ::open(fname, O_RDONLY, 00644);
-    if (fd != -1) {
-      is_open = true;
-    }
-    return is_open;
-  }
-  bool close() {
-    if (is_open) {
-      ::close(fd);
-    }
-    return true;
-  }
-  int fgetc() {
-    uint8_t val = -1;
-    if (!is_open) {
-      return -1;
-    }
-    ::read(fd, &val, (size_t)1);
-    pos++;
-    return (int)val;
-  }
-  int read(uint8_t *buf, size_t numbytes) {
-    if (!is_open) {
-      return -1;
-    }
-    int total_bytes_read = 0;
-    do {
-      int num_rd;
-      num_rd = (int)::read(fd, buf, numbytes);
-      if (num_rd == 0) break;
-      pos += num_rd;
-      numbytes -= num_rd;
-      buf += num_rd;
-      total_bytes_read += num_rd;
-    } while (numbytes > 0);
-    return total_bytes_read;
-  }
-  int64_t get_pos() {
-    if (!is_open) return 0;
-    return (int64_t)::lseek(fd, 0, SEEK_CUR);
-  }
-  int64_t seek(int64_t pos) {
-    if (!is_open) return 0;
-    if (pos < 0)
-      return (int64_t)::lseek(fd, 0, SEEK_END);
-    else {
-      off_t offset = (off_t)pos;
-      if (pos != (int64_t)offset) {
-        offset = INT32_MAX;
-      };
-      return (int64_t)::lseek(fd, offset, SEEK_SET);
-    }
-  }
-};
 // eat white/LF/CR and comments
 static auto eat_white = [](int &d, FILE *fp, char *comment) {
-  while (d == SPC || d == LF || d == CR) {
+  while (d == SP || d == LF || d == CR) {
     d = fgetc(fp);
     if (d == '#') {
       static_cast<void>(fgets(comment, 256, fp));
       d = fgetc(fp);
-    }
-  }
-};
-static auto eat_white_nb = [](int &d, openhtj2k_file *fp, char *comment) {
-  while (d == SPC || d == LF || d == CR) {
-    d = fp->fgetc();
-    if (d == '#') {
-      // static_cast<void>(fgets(comment, 256, fp));
-      do {
-        d = fp->fgetc();
-      } while (d != LF || d != CR);
     }
   }
 };
