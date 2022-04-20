@@ -6,6 +6,10 @@ project(
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+if (CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "^[xX]86_64$|^[aA][mM][dD]64$")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mtune=native -march=native")
+endif()
+
 if(APPLE)
   if(CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "^arm64")
     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
