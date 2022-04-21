@@ -227,10 +227,9 @@ int image::read_ppm(const std::string &filename, uint16_t compidx) {
     default:
       break;
   }
-#else
+#elif defined(__AVX2__)
   switch (byte_per_sample) {
     case 1:  // <= 8bpp
-  #ifdef __AVX2__
       for (size_t i = 0; i < compw * comph - (compw * comph) % 16; i += 16) {
         load_u8_store_s32(src + component_gap * i, R + i, G + i, B + i);
       }
@@ -240,20 +239,11 @@ int image::read_ppm(const std::string &filename, uint16_t compidx) {
         G[i] = src[component_gap * i + byte_per_sample];
         B[i] = src[component_gap * i + 2 * byte_per_sample];
       }
-  #else
-      for (size_t i = 0; i < compw * comph; ++i) {
-        R[i] = src[component_gap * i];
-        G[i] = src[component_gap * i + byte_per_sample];
-        B[i] = src[component_gap * i + 2 * byte_per_sample];
-      }
-  #endif
       break;
     case 2:  // > 8bpp
-  #ifdef __AVX2__
       for (size_t i = 0; i < compw * comph - (compw * comph) % 8; i += 8) {
         load_u16_store_s32((uint16_t *)(src + component_gap * i), R + i, G + i, B + i);
       }
-
       for (size_t i = compw * comph - (compw * comph) % 8; i < compw * comph; ++i) {
         R[i] = src[component_gap * i] << 8;
         G[i] = src[component_gap * i + byte_per_sample] << 8;
@@ -262,7 +252,20 @@ int image::read_ppm(const std::string &filename, uint16_t compidx) {
         G[i] |= src[component_gap * i + byte_per_sample + 1];
         B[i] |= src[component_gap * i + 2 * byte_per_sample + 1];
       }
-  #else
+      break;
+    default:
+      break;
+  }
+#else
+  switch (byte_per_sample) {
+    case 1:  // <= 8bpp
+      for (size_t i = 0; i < compw * comph; ++i) {
+        R[i] = src[component_gap * i];
+        G[i] = src[component_gap * i + byte_per_sample];
+        B[i] = src[component_gap * i + 2 * byte_per_sample];
+      }
+      break;
+    case 2:  // > 8bpp
       for (size_t i = 0; i < compw * comph; ++i) {
         R[i] = src[component_gap * i] << 8;
         G[i] = src[component_gap * i + byte_per_sample] << 8;
@@ -271,7 +274,6 @@ int image::read_ppm(const std::string &filename, uint16_t compidx) {
         G[i] |= src[component_gap * i + byte_per_sample + 1];
         B[i] |= src[component_gap * i + 2 * byte_per_sample + 1];
       }
-  #endif
       break;
     default:
       break;
