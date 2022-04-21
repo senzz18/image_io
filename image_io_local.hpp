@@ -52,13 +52,15 @@ static inline void *aligned_mem_alloc(size_t size, size_t align) {
 
 template <class T>
 struct delete_aligned {
+  void operator()(T *data) const {
 #if defined(_MSC_VER)
-  _aligned_free(data);
+    _aligned_free(data);
 #elif defined(__MINGW32__) || defined(__MINGW64__)
-  __mingw_aligned_free(data);
+    __mingw_aligned_free(data);
 #else
-  void operator()(T *data) const { free(data); }
+    free(data);
 #endif
+  }
 };
 template <class T>
 using unique_ptr_aligned = std::unique_ptr<T, delete_aligned<T>>;
