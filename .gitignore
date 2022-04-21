@@ -42,3 +42,6 @@ build/
 
 # Bin directory
 bin/
+
+# Xcode
+xcode/
