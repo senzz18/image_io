@@ -1,7 +1,9 @@
 #include <algorithm>
 
 #include "image_io.hpp"
-
+#if defined(USE_OPENMP)
+  #include <omp.h>
+#endif
 image::image(const std::vector<std::string> &filenames) : width(0), height(0), buf(nullptr) {
   size_t num_files = filenames.size();
   if (num_files > 16384) {
@@ -241,10 +243,11 @@ int image::read_ppm(const std::string &filename, uint16_t compidx) {
       }
       break;
     case 2:  // > 8bpp
+  #pragma omp parallel for
       for (size_t i = 0; i < compw * comph - (compw * comph) % 8; i += 8) {
         load_u16_store_s32((uint16_t *)(src + component_gap * i), R + i, G + i, B + i);
       }
-      for (size_t i = compw * comph - (compw * comph) % 8; i < compw * comph; ++i) {
+      for (size_t i = compw * comph - (compw * comph) % 16; i < compw * comph; ++i) {
         R[i] = src[component_gap * i] << 8;
         G[i] = src[component_gap * i + byte_per_sample] << 8;
         B[i] = src[component_gap * i + 2 * byte_per_sample] << 8;

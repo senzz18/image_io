@@ -167,7 +167,8 @@ static auto store_little_s16_to_s32 = [](uint16x8_t &src, int32_t *dst) {
   vst1q_s32(dst + 4, xh);
 };
 #elif defined(__AVX2__)
-auto load_u8_store_s32 = [](uint8_t const *src, int32_t *const R, int32_t *const G, int32_t *const B) {
+static auto load_u8_store_s32 = [](uint8_t const *src, int32_t *const R, int32_t *const G,
+                                   int32_t *const B) {
   __m128i tmp0, tmp1, tmp2, tmp3;
   alignas(16) static const int8_t mask8_R[16] = {0, 3, 6, 9, 12, 15, 1, 4, 7, 10, 13, 2, 5, 8, 11, 14};
   alignas(16) static const int8_t mask8_G[16] = {2, 5, 8, 11, 14, 0, 3, 6, 9, 12, 15, 1, 4, 7, 10, 13};
@@ -220,12 +221,13 @@ auto load_u8_store_s32 = [](uint8_t const *src, int32_t *const R, int32_t *const
   _mm256_storeu_si256((__m256i *)(B + 8), _mm256_cvtepi8_epi32(Bhigh));
 };
 
-auto load_u16_store_s32 = [](uint16_t const *src, int32_t *const R, int32_t *const G, int32_t *const B) {
+static auto load_u16_store_s32 = [](uint16_t const *src, int32_t *const R, int32_t *const G,
+                                    int32_t *const B) {
   __m128i tmp0, tmp1, tmp2, tmp3;
   alignas(16) static const int8_t mask16_0[16] = {0, 1, 6, 7, 12, 13, 2, 3, 8, 9, 14, 15, 4, 5, 10, 11};
   alignas(16) static const int8_t mask16_1[16] = {2, 3, 8, 9, 14, 15, 4, 5, 10, 11, 0, 1, 6, 7, 12, 13};
   alignas(16) static const int8_t mask16_2[16] = {4, 5, 10, 11, 0, 1, 6, 7, 12, 13, 2, 3, 8, 9, 14, 15};
-  alignas(16) static const int8_t count8[2] = {8, 8};
+
   __m128i v0 = _mm_loadu_si128((__m128i *)(src));       // a0,a1,a2,a3,...a7,
   __m128i v1 = _mm_loadu_si128((__m128i *)(src + 8));   // b0,b1,b2,b3...b7
   __m128i v2 = _mm_loadu_si128((__m128i *)(src + 16));  // c0,c1,c2,c3,...c7
@@ -272,4 +274,5 @@ auto load_u16_store_s32 = [](uint16_t const *src, int32_t *const R, int32_t *con
   v2 = _mm_or_si128(v2a, v2b);
   _mm256_stream_si256((__m256i *)B, _mm256_cvtepu16_epi32(v2));
 };
+
 #endif
