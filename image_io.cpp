@@ -251,7 +251,7 @@ int image::read_ppm(const std::string &filename, uint16_t compidx) {
     case 2:  // > 8bpp
   #ifdef __AVX2__
       for (size_t i = 0; i < compw * comph - (compw * comph) % 8; i += 8) {
-        load_u16_store_s32(src + component_gap * i, R + i, G + i, B + i);
+        load_u16_store_s32((uint16_t *)(src + component_gap * i), R + i, G + i, B + i);
       }
 
       for (size_t i = compw * comph - (compw * comph) % 8; i < compw * comph; ++i) {

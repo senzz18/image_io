@@ -149,7 +149,7 @@ static auto store_little_s16_to_s32 = [](uint16x8_t &src, int32_t *dst) {
   vst1q_s32(dst + 4, xh);
 };
 #elif defined(__AVX2__)
-static auto load_u8_store_s32(uint8_t const *src, int32_t *const R, int32_t *const G, int32_t *const B) {
+auto load_u8_store_s32 = [](uint8_t const *src, int32_t *const R, int32_t *const G, int32_t *const B) {
   __m128i tmp0, tmp1, tmp2, tmp3;
   alignas(16) static const int8_t mask8_R[16] = {0, 3, 6, 9, 12, 15, 1, 4, 7, 10, 13, 2, 5, 8, 11, 14};
   alignas(16) static const int8_t mask8_G[16] = {2, 5, 8, 11, 14, 0, 3, 6, 9, 12, 15, 1, 4, 7, 10, 13};
@@ -200,9 +200,9 @@ static auto load_u8_store_s32(uint8_t const *src, int32_t *const R, int32_t *con
   auto Blow  = _mm_move_epi64(v2);
   _mm256_storeu_si256((__m256i *)B, _mm256_cvtepi8_epi32(Blow));
   _mm256_storeu_si256((__m256i *)(B + 8), _mm256_cvtepi8_epi32(Bhigh));
-}
+};
 
-static auto load_u16_store_s32(uint8_t const *src, int32_t *const R, int32_t *const G, int32_t *const B) {
+auto load_u16_store_s32 = [](uint16_t const *src, int32_t *const R, int32_t *const G, int32_t *const B) {
   __m128i tmp0, tmp1, tmp2, tmp3;
   alignas(16) static const int8_t mask16_0[16] = {0, 1, 6, 7, 12, 13, 2, 3, 8, 9, 14, 15, 4, 5, 10, 11};
   alignas(16) static const int8_t mask16_1[16] = {2, 3, 8, 9, 14, 15, 4, 5, 10, 11, 0, 1, 6, 7, 12, 13};
@@ -225,7 +225,7 @@ static auto load_u16_store_s32(uint8_t const *src, int32_t *const R, int32_t *co
   __m128i v0a = _mm_slli_epi16(v0, 8);
   __m128i v0b = _mm_srli_epi16(v0, 8);
   v0          = _mm_or_si128(v0a, v0b);
-  _mm256_storeu_si256((__m256i *)R, _mm256_cvtepu16_epi32(v0));
+  _mm256_stream_si256((__m256i *)R, _mm256_cvtepu16_epi32(v0));
 
   tmp3        = _mm_slli_si128(tmp0, 4);   // 0,0,a0,a3,a6,a1,a4,a7
   tmp3        = _mm_srli_si128(tmp3, 10);  // a1,a4,a7, 0,0,0,0,0
@@ -240,7 +240,7 @@ static auto load_u16_store_s32(uint8_t const *src, int32_t *const R, int32_t *co
   __m128i v1a = _mm_slli_epi16(v1, 8);
   __m128i v1b = _mm_srli_epi16(v1, 8);
   v1          = _mm_or_si128(v1a, v1b);
-  _mm256_storeu_si256((__m256i *)G, _mm256_cvtepu16_epi32(v1));
+  _mm256_stream_si256((__m256i *)G, _mm256_cvtepu16_epi32(v1));
 
   tmp3        = _mm_srli_si128(tmp2, 10);  // c1,c4,c7, 0,0,0,0,0
   tmp3        = _mm_slli_si128(tmp3, 10);  // 0,0,0,0,0, c1,c4,c7,
@@ -252,6 +252,6 @@ static auto load_u16_store_s32(uint8_t const *src, int32_t *const R, int32_t *co
   __m128i v2a = _mm_slli_epi16(v2, 8);
   __m128i v2b = _mm_srli_epi16(v2, 8);
   v2          = _mm_or_si128(v2a, v2b);
-  _mm256_storeu_si256((__m256i *)B, _mm256_cvtepu16_epi32(v2));
-}
+  _mm256_stream_si256((__m256i *)B, _mm256_cvtepu16_epi32(v2));
+};
 #endif
