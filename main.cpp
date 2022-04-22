@@ -25,36 +25,36 @@ int main(int argc, char *argv[]) {
            img.get_component_width(i), img.get_component_height(i), bpp, s);
   }
 #if defined(USE_OPENCV)
-  // cv::Mat test(img.get_component_height(0), img.get_component_width(0), CV_8UC1);
-  // int32_t *src = img.get_buf(0);
-  // uint8_t bpp  = (img.get_Ssiz_value(0) & 0x7F) + 1;
-  // uint8_t s    = (img.get_Ssiz_value(0) & 0x80) >> 7;
-  // for (int i = 0; i < test.rows; ++i) {
-  //   for (int j = 0; j < test.cols; ++j) {
-  //     if (bpp - 8 > 0) {
-  //       test.data[i * test.cols + j] = (src[0] + (1 << (bpp - 1)) * s) >> (bpp - 8);
-  //     } else {
-  //       test.data[i * test.cols + j] = (src[0] + (1 << (bpp - 1)) * s) << (8 - bpp);
-  //     }
-  //     src++;
-  //   }
-  // }
-  cv::Mat test(img.get_component_height(0), img.get_component_width(0), CV_8UC3);
-  int32_t *srcR = img.get_buf(0);
-  int32_t *srcG = img.get_buf(1);
-  int32_t *srcB = img.get_buf(2);
-  uint8_t bpp   = (img.get_Ssiz_value(0) & 0x7F) + 1;
-  uint8_t s     = (img.get_Ssiz_value(0) & 0x80) >> 7;
+  cv::Mat test(img.get_component_height(0), img.get_component_width(0), CV_8UC1);
+  int32_t *src = img.get_buf(0);
+  uint8_t bpp  = (img.get_Ssiz_value(0) & 0x7F) + 1;
+  uint8_t s    = (img.get_Ssiz_value(0) & 0x80) >> 7;
   for (int i = 0; i < test.rows; ++i) {
     for (int j = 0; j < test.cols; ++j) {
-      test.data[3 * (i * test.cols + j)]     = (srcB[0] + (1 << (bpp - 1)) * s) >> (bpp - 8);
-      test.data[3 * (i * test.cols + j) + 1] = (srcG[0] + (1 << (bpp - 1)) * s) >> (bpp - 8);
-      test.data[3 * (i * test.cols + j) + 2] = (srcR[0] + (1 << (bpp - 1)) * s) >> (bpp - 8);
-      srcB++;
-      srcG++;
-      srcR++;
+      if (bpp - 8 > 0) {
+        test.data[i * test.cols + j] = (src[0] + (1 << (bpp - 1)) * s) >> (bpp - 8);
+      } else {
+        test.data[i * test.cols + j] = (src[0] + (1 << (bpp - 1)) * s) << (8 - bpp);
+      }
+      src++;
     }
   }
+  // cv::Mat test(img.get_component_height(0), img.get_component_width(0), CV_8UC3);
+  // int32_t *srcR = img.get_buf(0);
+  // int32_t *srcG = img.get_buf(1);
+  // int32_t *srcB = img.get_buf(2);
+  // uint8_t bpp   = (img.get_Ssiz_value(0) & 0x7F) + 1;
+  // uint8_t s     = (img.get_Ssiz_value(0) & 0x80) >> 7;
+  // for (int i = 0; i < test.rows; ++i) {
+  //   for (int j = 0; j < test.cols; ++j) {
+  //     test.data[3 * (i * test.cols + j)]     = (srcB[0] + (1 << (bpp - 1)) * s) >> (bpp - 8);
+  //     test.data[3 * (i * test.cols + j) + 1] = (srcG[0] + (1 << (bpp - 1)) * s) >> (bpp - 8);
+  //     test.data[3 * (i * test.cols + j) + 2] = (srcR[0] + (1 << (bpp - 1)) * s) >> (bpp - 8);
+  //     srcB++;
+  //     srcG++;
+  //     srcR++;
+  //   }
+  // }
   cv::imshow("Monochrome preview in 8bpp", test);
   cv::waitKey();
   cv::destroyAllWindows();

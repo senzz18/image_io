@@ -197,33 +197,34 @@ int image::read_ppm(const std::string &filename, uint16_t compidx) {
 #if defined(USE_ARM_NEON)
   switch (byte_per_sample) {
     case 1:  // <= 8bpp
-
-      for (size_t i = 0; i < simdlen; i += simdgap) {
-        uint8x16x3_t vsrc = vld3q_u8((src + i * component_gap));
-        store_u8_to_s32(vsrc.val[0], R + i);
-        store_u8_to_s32(vsrc.val[1], G + i);
-        store_u8_to_s32(vsrc.val[2], B + i);
+      for (size_t i = simdlen; i > 0;
+           i -= simdgap, R += simdgap, G += simdgap, B += simdgap, src += simdgap * component_gap) {
+        uint8x16x3_t vsrc = vld3q_u8((src));
+        store_u8_to_s32(vsrc.val[0], R);
+        store_u8_to_s32(vsrc.val[1], G);
+        store_u8_to_s32(vsrc.val[2], B);
       }
-      for (size_t i = simdlen; i < compw * comph; ++i) {
-        R[i] = src[component_gap * i];
-        G[i] = src[component_gap * i + byte_per_sample];
-        B[i] = src[component_gap * i + 2 * byte_per_sample];
+      for (size_t i = compw * comph - simdlen; i > 0; --i, ++R, ++G, ++B, src += component_gap) {
+        R[0] = src[0];
+        G[0] = src[1];
+        B[0] = src[2];
       }
       break;
     case 2:  // > 8bpp
-      for (size_t i = 0; i < simdlen; i += simdgap) {
-        uint16x8x3_t vsrc = vld3q_u16((uint16_t *)(src + i * component_gap));
-        store_big_u16_to_s32(vsrc.val[0], R + i);
-        store_big_u16_to_s32(vsrc.val[1], G + i);
-        store_big_u16_to_s32(vsrc.val[2], B + i);
+      for (size_t i = simdlen; i > 0;
+           i -= simdgap, R += simdgap, G += simdgap, B += simdgap, src += simdgap * component_gap) {
+        uint16x8x3_t vsrc = vld3q_u16((uint16_t *)(src));
+        store_big_u16_to_s32(vsrc.val[0], R);
+        store_big_u16_to_s32(vsrc.val[1], G);
+        store_big_u16_to_s32(vsrc.val[2], B);
       }
-      for (size_t i = simdlen; i < compw * comph; ++i) {
-        R[i] = src[component_gap * i] << 8;
-        R[i] |= src[component_gap * i + 1];
-        G[i] = src[component_gap * i + 2] << 8;
-        G[i] |= src[component_gap * i + 3];
-        B[i] = src[component_gap * i + 4] << 8;
-        B[i] |= src[component_gap * i + 5];
+      for (size_t i = compw * comph - simdlen; i > 0; --i, ++R, ++G, ++B, src += component_gap) {
+        R[0] = src[0] << 8;
+        R[0] |= src[1];
+        G[0] = src[2] << 8;
+        G[0] |= src[3];
+        B[0] = src[4] << 8;
+        B[0] |= src[5];
       }
       break;
     default:
@@ -244,16 +245,18 @@ int image::read_ppm(const std::string &filename, uint16_t compidx) {
       break;
     case 2:  // > 8bpp
   #pragma omp parallel for
-      for (size_t i = 0; i < compw * comph - (compw * comph) % 8; i += 8) {
-        load_u16_store_s32((uint16_t *)(src + component_gap * i), R + i, G + i, B + i);
+      for (size_t i = compw * comph - (compw * comph) % 8; i > 0;
+           i -= 8, src += component_gap * 8, R += 8, G += 8, B += 8) {
+        load_u16_store_s32((uint16_t *)(src), R, G, B);
       }
-      for (size_t i = compw * comph - (compw * comph) % 16; i < compw * comph; ++i) {
-        R[i] = src[component_gap * i] << 8;
-        G[i] = src[component_gap * i + byte_per_sample] << 8;
-        B[i] = src[component_gap * i + 2 * byte_per_sample] << 8;
-        R[i] |= src[component_gap * i + 1];
-        G[i] |= src[component_gap * i + byte_per_sample + 1];
-        B[i] |= src[component_gap * i + 2 * byte_per_sample + 1];
+      for (size_t i = compw * comph - (compw * comph) % 16; i > 0;
+           --i, src += component_gap, ++R, ++G, ++B) {
+        R[0] = src[0] << 8;
+        G[0] = src[byte_per_sample] << 8;
+        B[0] = src[2 * byte_per_sample] << 8;
+        R[0] |= src[1];
+        G[0] |= src[byte_per_sample + 1];
+        B[0] |= src[2 * byte_per_sample + 1];
       }
       break;
     default:

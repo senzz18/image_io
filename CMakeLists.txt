@@ -50,12 +50,12 @@ endif()
 
 
 add_executable(image_io_test main.cpp image_io.cpp pgm_io.cpp pgx_io.cpp)
-find_package(OpenMP REQUIRED)
-if(OpenMP_FOUND)
-  message(STATUS "OpenMP is found.")
-  target_compile_definitions(image_io_test PUBLIC USE_OPENMP)
-  target_link_libraries(image_io_test PRIVATE OpenMP::OpenMP_CXX)
-endif()
+# find_package(OpenMP REQUIRED)
+# if(OpenMP_FOUND)
+#   message(STATUS "OpenMP is found.")
+#   target_compile_definitions(image_io_test PUBLIC USE_OPENMP)
+#   target_link_libraries(image_io_test PRIVATE OpenMP::OpenMP_CXX)
+# endif()
 
 # find_package(OpenCV)
 # if(OpenCV_FOUND)
