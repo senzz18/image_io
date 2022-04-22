@@ -4,6 +4,12 @@
 #if defined(USE_OPENMP)
   #include <omp.h>
 #endif
+
+#if defined(MSVC)
+#else
+  #include <fcntl.h>
+  #include <sys/mman.h>
+#endif
 image::image(const std::vector<std::string> &filenames) : width(0), height(0), buf(nullptr) {
   size_t num_files = filenames.size();
   if (num_files > 16384) {
@@ -169,6 +175,7 @@ int image::read_ppm(const std::string &filename, uint16_t compidx) {
   }
   eat_white(d, fp, comment);
   fseek(fp, -1, SEEK_CUR);
+  long offset = ftell(fp);
 
   const uint32_t byte_per_sample      = (components[compidx]->get_bpp() + 8 - 1) / 8;
   const uint32_t component_gap        = 3 * byte_per_sample;

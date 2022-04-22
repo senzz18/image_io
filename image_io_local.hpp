@@ -103,7 +103,7 @@ class image_component {
 
 #if defined(USE_ARM_NEON)
 // store uint8x16_t vector as int32
-static auto store_u8_to_s32 = [](uint8x16_t &src, int32_t *dst) {
+static auto store_u8_to_s32(uint8x16_t &src, int32_t *dst) {
   int16x8_t l = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(src)));
   int16x8_t h = vreinterpretq_s16_u16(vmovl_u8(vget_high_u8(src)));
   auto ll     = vmovl_s16(vget_low_s16(l));
@@ -114,10 +114,10 @@ static auto store_u8_to_s32 = [](uint8x16_t &src, int32_t *dst) {
   vst1q_s32(dst + 4, lh);
   vst1q_s32(dst + 8, hl);
   vst1q_s32(dst + 12, hh);
-};
+}
 
 // store int8x16_t vector as int32
-static auto store_s8_to_s32 = [](int8x16_t &src, int32_t *dst) {
+static auto store_s8_to_s32(int8x16_t &src, int32_t *dst) {
   int16x8_t l = vreinterpretq_s16_u16(vmovl_s8(vget_low_s8(src)));
   int16x8_t h = vreinterpretq_s16_u16(vmovl_s8(vget_high_s8(src)));
   auto ll     = vmovl_s16(vget_low_s16(l));
@@ -128,47 +128,46 @@ static auto store_s8_to_s32 = [](int8x16_t &src, int32_t *dst) {
   vst1q_s32(dst + 4, lh);
   vst1q_s32(dst + 8, hl);
   vst1q_s32(dst + 12, hh);
-};
+}
 
 // store big-endian uint16x8_t vector as int32
-static auto store_big_u16_to_s32 = [](uint16x8_t &src, int32_t *dst) {
+static inline auto store_big_u16_to_s32(uint16x8_t &src, int32_t *dst) {
   auto little_big = vrev16q_u8(src);  // convert endianness from big to little
   auto x0         = vreinterpretq_s32_u16(little_big);
   auto xl         = vmovl_s16(vreinterpret_s16_s32(vget_low_s32(x0)));
   auto xh         = vmovl_s16(vreinterpret_s16_s32(vget_high_s32(x0)));
   vst1q_s32(dst, xl);
   vst1q_s32(dst + 4, xh);
-};
+}
 
 // store little-endian uint16x8_t vector as int32
-static auto store_little_u16_to_s32 = [](uint16x8_t &src, int32_t *dst) {
+static inline auto store_little_u16_to_s32(uint16x8_t &src, int32_t *dst) {
   auto x0 = vreinterpretq_s32_u16(vreinterpretq_u16_u8(src));
   auto xl = vmovl_s16(vreinterpret_s16_s32(vget_low_s32(x0)));
   auto xh = vmovl_s16(vreinterpret_s16_s32(vget_high_s32(x0)));
   vst1q_s32(dst, xl);
   vst1q_s32(dst + 4, xh);
-};
+}
 
 // store big-endian int16x8_t vector as int32
-static auto store_big_s16_to_s32 = [](uint16x8_t &src, int32_t *dst) {
+static inline auto store_big_s16_to_s32(uint16x8_t &src, int32_t *dst) {
   auto x0 = vreinterpretq_s32_s16(vreinterpretq_s16_u8(vrev16q_u8(src)));
   auto xl = vmovl_s16(vreinterpret_s16_s32(vget_low_s32(x0)));
   auto xh = vmovl_s16(vreinterpret_s16_s32(vget_high_s32(x0)));
   vst1q_s32(dst, xl);
   vst1q_s32(dst + 4, xh);
-};
+}
 
 // store little-endian int16x8_t vector as int32
-static auto store_little_s16_to_s32 = [](uint16x8_t &src, int32_t *dst) {
+static inline auto store_little_s16_to_s32(uint16x8_t &src, int32_t *dst) {
   auto x0 = vreinterpretq_s32_s16(vreinterpretq_s16_u8(src));
   auto xl = vmovl_s16(vreinterpret_s16_s32(vget_low_s32(x0)));
   auto xh = vmovl_s16(vreinterpret_s16_s32(vget_high_s32(x0)));
   vst1q_s32(dst, xl);
   vst1q_s32(dst + 4, xh);
-};
+}
 #elif defined(__AVX2__)
-static auto load_u8_store_s32 = [](uint8_t const *src, int32_t *const R, int32_t *const G,
-                                   int32_t *const B) {
+static auto load_u8_store_s32(uint8_t const *src, int32_t *const R, int32_t *const G, int32_t *const B) {
   __m128i tmp0, tmp1, tmp2, tmp3;
   alignas(16) static const int8_t mask8_R[16] = {0, 3, 6, 9, 12, 15, 1, 4, 7, 10, 13, 2, 5, 8, 11, 14};
   alignas(16) static const int8_t mask8_G[16] = {2, 5, 8, 11, 14, 0, 3, 6, 9, 12, 15, 1, 4, 7, 10, 13};
@@ -219,10 +218,9 @@ static auto load_u8_store_s32 = [](uint8_t const *src, int32_t *const R, int32_t
   auto Blow = _mm_move_epi64(v2);
   _mm256_storeu_si256((__m256i *)B, _mm256_cvtepi8_epi32(Blow));
   _mm256_storeu_si256((__m256i *)(B + 8), _mm256_cvtepi8_epi32(Bhigh));
-};
+}
 
-static auto load_u16_store_s32 = [](uint16_t const *src, int32_t *const R, int32_t *const G,
-                                    int32_t *const B) {
+static auto load_u16_store_s32(uint16_t const *src, int32_t *const R, int32_t *const G, int32_t *const B) {
   __m128i tmp0, tmp1, tmp2, tmp3;
   alignas(16) static const int8_t mask16_0[16] = {0, 1, 6, 7, 12, 13, 2, 3, 8, 9, 14, 15, 4, 5, 10, 11};
   alignas(16) static const int8_t mask16_1[16] = {2, 3, 8, 9, 14, 15, 4, 5, 10, 11, 0, 1, 6, 7, 12, 13};
@@ -242,9 +240,9 @@ static auto load_u16_store_s32 = [](uint16_t const *src, int32_t *const R, int32
   tmp3 = _mm_srli_si128(tmp3, 4);          // a0,a3,a6,b1,b4,b7,0,0
   v0 = _mm_slli_si128(tmp2, 12);           // 0,0,0,0,0,0, c2,c5,
   v0 = _mm_or_si128(v0, tmp3);             // a0,a3,a6,b1,b4,b7,c2,c5
-  __m128i v0a = _mm_slli_epi16(v0, 8);
-  __m128i v0b = _mm_srli_epi16(v0, 8);
-  v0 = _mm_or_si128(v0a, v0b);
+  __m128i va = _mm_slli_epi16(v0, 8);
+  __m128i vb = _mm_srli_epi16(v0, 8);
+  v0 = _mm_or_si128(va, vb);
   _mm256_stream_si256((__m256i *)R, _mm256_cvtepu16_epi32(v0));
 
   tmp3 = _mm_slli_si128(tmp0, 4);   // 0,0,a0,a3,a6,a1,a4,a7
@@ -257,9 +255,9 @@ static auto load_u16_store_s32 = [](uint16_t const *src, int32_t *const R, int32
   tmp3 = _mm_srli_si128(tmp2, 4);   // c0,c3,c6, c1,c4,c7,0,0
   tmp3 = _mm_slli_si128(tmp3, 10);  // 0,0,0,0,0,c0,c3,c6,
   v1 = _mm_or_si128(v1, tmp3);      // a1,a4,a7,b2,b5,c0,c3,c6,
-  __m128i v1a = _mm_slli_epi16(v1, 8);
-  __m128i v1b = _mm_srli_epi16(v1, 8);
-  v1 = _mm_or_si128(v1a, v1b);
+  va = _mm_slli_epi16(v1, 8);
+  vb = _mm_srli_epi16(v1, 8);
+  v1 = _mm_or_si128(va, vb);
   _mm256_stream_si256((__m256i *)G, _mm256_cvtepu16_epi32(v1));
 
   tmp3 = _mm_srli_si128(tmp2, 10);  // c1,c4,c7, 0,0,0,0,0
@@ -269,10 +267,10 @@ static auto load_u16_store_s32 = [](uint16_t const *src, int32_t *const R, int32
   v2 = _mm_or_si128(v2, tmp3);      // 0,0, b0,b3,b6,c1,c4,c7,
   tmp0 = _mm_srli_si128(tmp0, 12);  // a2,a5,0,0,0,0,0,0
   v2 = _mm_or_si128(v2, tmp0);      // a2,a5,b0,b3,b6,c1,c4,c7,
-  __m128i v2a = _mm_slli_epi16(v2, 8);
-  __m128i v2b = _mm_srli_epi16(v2, 8);
-  v2 = _mm_or_si128(v2a, v2b);
+  va = _mm_slli_epi16(v2, 8);
+  vb = _mm_srli_epi16(v2, 8);
+  v2 = _mm_or_si128(va, vb);
   _mm256_stream_si256((__m256i *)B, _mm256_cvtepu16_epi32(v2));
-};
+}
 
 #endif
