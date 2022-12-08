@@ -20,6 +20,19 @@ class image {
 
  public:
   explicit image(const std::vector<std::string> &filenames);
+  explicit image(uint32_t w, uint32_t h, uint16_t nc, uint8_t bpp, bool issigned) {
+    width          = w;
+    height         = h;
+    num_components = nc;
+    this->buf      = std::make_unique<unique_ptr_aligned<int32_t>[]>(this->num_components);
+    for (int c = 0; c < num_components; ++c) {
+      component_width.push_back(width);
+      component_height.push_back(height);
+      bits_per_pixel.push_back(bpp);
+      is_signed.push_back(issigned);
+      this->buf[c] = aligned_uptr<int32_t>(32, width * height);
+    }
+  }
   int read_ppm(const std::string &filename, uint16_t compidx);
   uint32_t get_width() const { return this->width; }
   uint32_t get_height() const { return this->height; }
