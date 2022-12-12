@@ -8,7 +8,11 @@ using i64  = int64_t;
 using i32  = int32_t;
 using i16  = int16_t;
 
+constexpr ui32 MAXVAL = 65535U;
+
 static ui64 _u64d_div__(ui64 b, ui64 c) { return b / c; }
+
+static ui32 _u32d_div__(ui32 b, ui32 c) { return b / c; }
 
 /**
  * @brief Saturate a value with a limit
@@ -45,11 +49,11 @@ class mat_coeff {
  * @param N input
  * @return cubic root of N
  */
-static ui16 cbrt_fix(ui16 N) {
-  ui32 a;
-  ui16 x_n;
-  ui16 x_n_1;
-  ui8 N_sqrt;
+static i32 cbrt_fix(i32 N) {
+  ui32 numerator;
+  mat_coeff k1_3(21845U, 2);  // = 1/3 * 2^16
+  i32 x_n, x_n_1;
+  ui16 N_sqrt;
   const ui32 eps = 65536U;
 
   N_sqrt = 0U;
@@ -62,19 +66,24 @@ static ui16 cbrt_fix(ui16 N) {
       }
     }
   }
-  x_n = static_cast<ui16>(N_sqrt << 8);
-  a   = (21845U * N) >> 2;
-  for (i32 b_i{0}; b_i < 5; b_i++) {
-    ui64 b0;
+  x_n       = static_cast<i32>(N_sqrt << 8);
+  numerator = k1_3.mul(N);
+  for (i32 i = 0; i < 5; ++i) {
+    ui64 x_n_partial;
     ui32 x_squared;
     x_squared = ((static_cast<ui32>(x_n) * x_n) >> 2) + eps;
     if (x_squared == 0UL) {
-      b0 = UINT64_MAX;
+      x_n_partial = MAXVAL;
     } else {
-      b0 = _u64d_div__(static_cast<ui64>(a) << 30, static_cast<ui64>(x_squared));
+      x_n_partial = _u64d_div__(static_cast<ui64>(numerator) << 30, static_cast<ui64>(x_squared));
+      // x_n_partial = _u32d_div__(numerator << 14, x_squared >> 16);
     }
-    x_n_1 = static_cast<ui16>(
-        (((static_cast<ui32>(x_n) << 14) - ((21845U * x_n) >> 2)) + static_cast<ui32>(b0)) >> 14);
+    x_n_1 =
+        (((static_cast<ui32>(x_n) << 14) - k1_3.mul(x_n)) + ((static_cast<ui32>(x_n_partial) >> 0) << 0))
+        >> 14;
+    // x_n_1 =
+    //     (((static_cast<ui32>(x_n) << 14) - k1_3.mul(x_n)) + (static_cast<ui32>(x_n_partial) << 16)) >>
+    //     14;
     x_n = x_n_1;
   }
   return x_n_1;
@@ -102,10 +111,10 @@ void rgb2xyb(image &rgb_in, image &xyb_out) {
     exit(EXIT_FAILURE);
   }
 
-  i32 *red, *grn, *blu;
-  red = rgb_in.get_buf(0);
-  grn = rgb_in.get_buf(1);
-  blu = rgb_in.get_buf(2);
+  i32 *buf_red, *buf_grn, *buf_blu;
+  buf_red = rgb_in.get_buf(0);
+  buf_grn = rgb_in.get_buf(1);
+  buf_blu = rgb_in.get_buf(2);
 
   i32 *buf_X, *buf_Y, *buf_B;
   buf_X = xyb_out.get_buf(0);
@@ -120,61 +129,61 @@ void rgb2xyb(image &rgb_in, image &xyb_out) {
    * @brief Scale input pixel value into Q16 format
    *
    * @param val input
-   * @return = floor(static_cast<double>(val) / 255.0 * 65536)
+   * @return Q16 foramt of input
    */
-  auto scale_pixel_value = [](i32 val, i32 bpp) { return static_cast<i32>(val) << (16 - bpp); };
+  auto scale_pixel_value = [](i32 val, i32 bpp) { return static_cast<ui32>(val) << (16 - bpp); };
 
-  ui16 R, G, B;
-  i32 X, Y, B_;
+  i32 r, g, b;  // RGB inputs are limited in 16bpp, ui16(0-65535)
+  i32 X, Y, B;
+  size_t idx        = 0;
   const auto stride = width;
   for (ui32 y = 0; y < height; ++y) {
+    idx = y * stride;
     for (ui32 x = 0; x < width; ++x) {
-      size_t idx = y * stride + x;
+      r = scale_pixel_value(buf_red[idx], bpp);
+      g = scale_pixel_value(buf_grn[idx], bpp);
+      b = scale_pixel_value(buf_blu[idx], bpp);
 
-      R = scale_pixel_value(red[idx], bpp);
-      G = scale_pixel_value(grn[idx], bpp);
-      B = scale_pixel_value(blu[idx], bpp);
+      Lmix = (T00.mul(r) + T01.mul(g) + T02.mul(b) - bias) >> 14;
+      Mmix = (T10.mul(r) + T11.mul(g) + T12.mul(b) - bias) >> 14;
+      Smix = (T20.mul(r) + T21.mul(g) + T22.mul(b) - bias) >> 14;
 
-      i32 Lmix_tmp = (5111U * B) >> 2;
+      // Limit _mix values to prevent overlow
+      Lmix = Lmix > 65535 ? 65535 : Lmix;
+      Mmix = Mmix > 65535 ? 65535 : Mmix;
+      Smix = Smix > 65535 ? 65535 : Smix;
 
-      Lmix = 4915U * R + ((40763U * G) >> 2) + Lmix_tmp - bias;
-      Lmix >>= 14;
       Lgamma = cbrt_fix(Lmix);
-
-      Mmix = ((15073U * R) >> 2) + ((22675U * G) >> 1) + Lmix_tmp - bias;
-      Mmix >>= 14;
       Mgamma = cbrt_fix(Mmix);
-
-      Smix = (3988U * R + ((13419U * G) >> 2)) + ((36163U * B) >> 2) - bias;
-      Smix >>= 14;
-      Sgamma = ((cbrt_fix(Smix) << 14) + bias_cbrt) >> 14;
+      Sgamma = ((static_cast<ui32>(cbrt_fix(Smix)) << 14) + bias_cbrt) >> 14;
 
       // X = (Lgamma - Mgamma) / 2;
-      X = ((Lgamma << 14) - (Mgamma << 14)) >> 15;
-
+      X = (Lgamma - Mgamma) >> 1;
       // Y = (Lgamma + Mgamma) / 2;
-      Y = static_cast<i32>((static_cast<ui32>(Lgamma) << 14) + (static_cast<ui32>(Mgamma) << 14));
+      Y = static_cast<i32>((static_cast<ui32>(Lgamma + Mgamma) << 14));
       Y += bias_cbrt * 2;
       Y >>= 15;
 
       // B = Sgamma
-      B_ = Sgamma;
+      B = Sgamma;
 
       buf_X[idx] = X;
       buf_Y[idx] = Y;
-      buf_B[idx] = B_;
+      buf_B[idx] = B;
+
+      idx++;
     }
   }
 }
 
 // Lgamma = cbrt_fix(
-//     static_cast<ui16>((static_cast<i32>((4915U * R + ((40763U * G) >> 2)) + Lmix_tmp) - bias) >>
+//     static_cast<ui16>((static_cast<i32>((4915U * r + ((40763U * g) >> 2)) + Lmix_tmp) - bias) >>
 //     14));
 // Mgamma = cbrt_fix(static_cast<ui16>(
-//     (static_cast<i32>((((15073U * R) >> 2) + ((22675U * G) >> 1)) + Lmix_tmp) - bias) >> 14));
+//     (static_cast<i32>((((15073U * r) >> 2) + ((22675U * g) >> 1)) + Lmix_tmp) - bias) >> 14));
 // Sgamma = static_cast<ui16>(
 //     ((cbrt_fix(static_cast<ui16>(
-//           (static_cast<i32>((3988U * R + ((13419U * G) >> 2)) + ((36163U * B) >> 2)) - bias) >>
+//           (static_cast<i32>((3988U * r + ((13419U * g) >> 2)) + ((36163U * b) >> 2)) - bias) >>
 //           14))
 //       << 14)
 //      + bias_cbrt)

@@ -124,6 +124,20 @@ static auto store_u8_to_s32(uint8x16_t &src, int32_t *dst) {
   vst1q_s32(dst + 12, hh);
 }
 
+// store uint8x16_t vector as uint32
+static auto store_u8_to_u32(uint8x16_t &src, int32_t *dst) {
+  int16x8_t l = vmovl_u8(vget_low_u8(src));
+  int16x8_t h = vmovl_u8(vget_high_u8(src));
+  auto ll     = vmovl_u16(vget_low_u16(l));
+  auto lh     = vmovl_u16(vget_high_u16(l));
+  auto hl     = vmovl_u16(vget_low_u16(h));
+  auto hh     = vmovl_u16(vget_high_u16(h));
+  vst1q_s32(dst, ll);
+  vst1q_s32(dst + 4, lh);
+  vst1q_s32(dst + 8, hl);
+  vst1q_s32(dst + 12, hh);
+}
+
 // store int8x16_t vector as int32
 static auto store_s8_to_s32(int8x16_t &src, int32_t *dst) {
   int16x8_t l = vreinterpretq_s16_u16(vmovl_s8(vget_low_s8(src)));
@@ -138,12 +152,36 @@ static auto store_s8_to_s32(int8x16_t &src, int32_t *dst) {
   vst1q_s32(dst + 12, hh);
 }
 
+// store int8x16_t vector as uint32
+static auto store_s8_to_u32(int8x16_t &src, int32_t *dst) {
+  int16x8_t l = vmovl_u8(vget_low_u8(src));
+  int16x8_t h = vmovl_u8(vget_high_u8(src));
+  auto ll     = vmovl_u16(vget_low_u16(l));
+  auto lh     = vmovl_u16(vget_high_u16(l));
+  auto hl     = vmovl_u16(vget_low_u16(h));
+  auto hh     = vmovl_u16(vget_high_u16(h));
+  vst1q_s32(dst, ll);
+  vst1q_s32(dst + 4, lh);
+  vst1q_s32(dst + 8, hl);
+  vst1q_s32(dst + 12, hh);
+}
+
 // store big-endian uint16x8_t vector as int32
 static inline auto store_big_u16_to_s32(uint16x8_t &src, int32_t *dst) {
   auto little_big = vrev16q_u8(src);  // convert endianness from big to little
   auto x0         = vreinterpretq_s32_u16(little_big);
   auto xl         = vmovl_s16(vreinterpret_s16_s32(vget_low_s32(x0)));
   auto xh         = vmovl_s16(vreinterpret_s16_s32(vget_high_s32(x0)));
+  vst1q_s32(dst, xl);
+  vst1q_s32(dst + 4, xh);
+}
+
+// store big-endian uint16x8_t vector as uint32
+static inline auto store_big_u16_to_u32(uint16x8_t &src, int32_t *dst) {
+  auto little_big = vrev16q_u8(src);  // convert endianness from big to little
+  auto x0         = vreinterpretq_u32_u16(little_big);
+  auto xl         = vmovl_u16(vreinterpret_u16_u32(vget_low_u32(x0)));
+  auto xh         = vmovl_u16(vreinterpret_u16_u32(vget_high_u32(x0)));
   vst1q_s32(dst, xl);
   vst1q_s32(dst + 4, xh);
 }

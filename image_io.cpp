@@ -207,9 +207,9 @@ int image::read_ppm(const std::string &filename, uint16_t compidx) {
 
       for (size_t i = 0; i < simdlen; i += simdgap) {
         uint8x16x3_t vsrc = vld3q_u8((src + i * component_gap));
-        store_u8_to_s32(vsrc.val[0], R + i);
-        store_u8_to_s32(vsrc.val[1], G + i);
-        store_u8_to_s32(vsrc.val[2], B + i);
+        store_u8_to_u32(vsrc.val[0], R + i);
+        store_u8_to_u32(vsrc.val[1], G + i);
+        store_u8_to_u32(vsrc.val[2], B + i);
       }
       for (size_t i = simdlen; i < compw * comph; ++i) {
         R[i] = src[component_gap * i];
@@ -220,9 +220,9 @@ int image::read_ppm(const std::string &filename, uint16_t compidx) {
     case 2:  // > 8bpp
       for (size_t i = 0; i < simdlen; i += simdgap) {
         uint16x8x3_t vsrc = vld3q_u16((uint16_t *)(src + i * component_gap));
-        store_big_u16_to_s32(vsrc.val[0], R + i);
-        store_big_u16_to_s32(vsrc.val[1], G + i);
-        store_big_u16_to_s32(vsrc.val[2], B + i);
+        store_big_u16_to_u32(vsrc.val[0], R + i);
+        store_big_u16_to_u32(vsrc.val[1], G + i);
+        store_big_u16_to_u32(vsrc.val[2], B + i);
       }
       for (size_t i = simdlen; i < compw * comph; ++i) {
         R[i] = src[component_gap * i] << 8;
