@@ -38,7 +38,7 @@
 .idea/
 
 # Build directory
-build/
+build*/
 
 # Bin directory
 bin/
