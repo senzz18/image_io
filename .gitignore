@@ -31,6 +31,8 @@
 *.out
 *.app
 
+.vscode/
+
 # VSCode
 .vscode/
 
@@ -45,3 +47,6 @@ bin/
 
 # Xcode
 xcode/
+
+.vscode/
+build/
